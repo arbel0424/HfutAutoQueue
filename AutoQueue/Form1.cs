@@ -25,6 +25,8 @@ namespace AutoQueue
         delegate void SetTextCallback(string text);
         delegate void SetButtonCallback(bool bStatus);
         protected string strNumResult;
+        
+        public InternetRequest req = new InternetRequest();
 
 
         public QueueForm()
@@ -97,7 +99,7 @@ namespace AutoQueue
                         gM.ReleaseMutex();
                         break;
                     }
-                    strTime = "离取票时间还有" + ts.Hours.ToString() + "小时" 
+                    strTime = "离取票时间还有" + ts.Hours.ToString() + "小时"
                         + ts.Minutes + "分钟" + ts.Seconds + "秒";
                     UpdateInfo(strTime);
                     gM.ReleaseMutex();
@@ -128,7 +130,7 @@ namespace AutoQueue
             if (this.InfoText.InvokeRequired)
             {
                 SetTextCallback d = new SetTextCallback(UpdateInfo);
-                this.Invoke(d, new object[] { strInfo});
+                this.Invoke(d, new object[] { strInfo });
             }
             else
                 InfoText.Text = strInfo;
@@ -139,7 +141,7 @@ namespace AutoQueue
             if (this.InfoText.InvokeRequired)
             {
                 SetTextCallback d = new SetTextCallback(UpdateResult);
-                this.Invoke(d, new object[] { strInfo});
+                this.Invoke(d, new object[] { strInfo });
             }
             else
                 ResultText.Text = "取到的号码-" + strInfo;
@@ -150,7 +152,7 @@ namespace AutoQueue
             if (this.StartButton.InvokeRequired || this.StopButton.InvokeRequired)
             {
                 SetButtonCallback d = new SetButtonCallback(ResetButtonStatus);
-                this.Invoke(d, new object[] { bStatus});
+                this.Invoke(d, new object[] { bStatus });
             }
             else
             {
@@ -162,49 +164,21 @@ namespace AutoQueue
         }
         public bool Login(string strUid, string strPwd)
         {
-            strUid = HttpUtility.UrlEncode(strUid);
-            strPwd = HttpUtility.UrlEncode(strPwd);
             string postData = string.Format("uid={0}&pwd={1}", strUid, strPwd);
-            byte[] param = System.Text.Encoding.GetEncoding("gb2312").GetBytes(postData);
             try
             {
-                CookieContainer cc = new CookieContainer();
-                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(LoginUrl);
-                req.CookieContainer = cc;
-                req.ContentType = "application/x-www-form-urlencoded";
-                req.Method = "POST";
-                req.ContentLength = param.Length;
-                req.AllowAutoRedirect = false;
-                Stream webStream = req.GetRequestStream();
-                webStream.Write(param, 0, param.Length);
-                webStream.Close();
-
-                HttpWebResponse response = (HttpWebResponse)req.GetResponse();
-                Stream dataStream = response.GetResponseStream();
-                StreamReader reader = new StreamReader(dataStream, Encoding.GetEncoding("gb2312"));
-                string result = reader.ReadToEnd();
-
-                // 检查获得的cookie
-                foreach (Cookie ck in response.Cookies)
-                {
-                    if (ck.Domain == "210.45.241.169")
-                    {
-                        ckCollection = response.Cookies;
-                        return true;
-                    }
-                }
-
-                // 出现错误
-                Trace.WriteLine("登录时出现错误");
-                Trace.Write(result);
-                return false;
+                string result = req.PostToUrl(LoginUrl, postData);
+                if ( result.IndexOf("密码错误") == -1)
+                    return true;
+                else
+                    return false;
             }
             catch (WebException we)
             {
                 string msg = we.Message;
                 return false;
             }
-            catch 
+            catch
             {
                 return false;
             }
@@ -226,17 +200,7 @@ namespace AutoQueue
 
             try
             {
-                // 首先要提取相关要POST的值
-                CookieContainer cc = new CookieContainer();
-                HttpWebRequest KeyReq = (HttpWebRequest)WebRequest.Create(QueueUrl);
-                KeyReq.CookieContainer = cc;
-                KeyReq.CookieContainer.Add(ckCollection);
-                KeyReq.Method = "GET";
-                HttpWebResponse response = (HttpWebResponse)KeyReq.GetResponse();
-                Stream dataStream = response.GetResponseStream();
-                StreamReader reader = new StreamReader(dataStream,
-                                            Encoding.GetEncoding("gb2312"));
-                string result = reader.ReadToEnd();
+                string result = req.GetUrl(QueueUrl);
                 // 利用正则进行提取
                 Match mc1 = Regex.Match(result, pattern1);
                 if (mc1 != null)
@@ -270,30 +234,14 @@ namespace AutoQueue
             Random rd = new Random();
             int x = rd.Next(150) + 10;
             int y = rd.Next(20) + 5;
-            strViewState = HttpUtility.UrlEncode(strViewState);
             strValidation = HttpUtility.UrlEncode(strValidation);
+            strViewState = HttpUtility.UrlEncode(strViewState);
             string postData = string.Format(paramPattern, strViewState,
                                         strValidation, x, y, strListID);
-            byte[] param = System.Text.Encoding.ASCII.GetBytes(postData);
             // 提交请求
             try
             {
-                CookieContainer cc = new CookieContainer();
-                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(QueueUrl);
-                //req.UserAgent = "Mozilla/5.0 (Windows NT 6.1; rv:18.0) Gecko/20100101 Firefox/18.0";
-                req.CookieContainer = cc;
-                req.CookieContainer.Add(ckCollection);
-                req.ContentType = "application/x-www-form-urlencoded";
-                req.Method = "POST";
-                req.ContentLength = param.Length;
-                Stream webStream = req.GetRequestStream();
-                webStream.Write(param, 0, param.Length);
-                webStream.Close();
-
-                HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
-                Stream dataStream = resp.GetResponseStream();
-                StreamReader reader = new StreamReader(dataStream, Encoding.GetEncoding("gb2312"));
-                string result = reader.ReadToEnd();
+                string result = req.PostToUrl(QueueUrl, postData);
 
                 Match mc = Regex.Match(result, pattern4);
                 if (mc != null)
@@ -307,15 +255,9 @@ namespace AutoQueue
                         if (mc != null)
                         {
                             string strPrint = mc5.Groups["key"].Value;
-                            CookieContainer cc2 = new CookieContainer();
-                            HttpWebRequest req2 = (HttpWebRequest)WebRequest.Create(QueueUrl);
-                            //req.UserAgent = "Mozilla/5.0 (Windows NT 6.1; rv:18.0) Gecko/20100101 Firefox/18.0";
-                            req2.CookieContainer = cc2;
-                            req2.CookieContainer.Add(ckCollection);
-                            req2.ContentType = "application/x-www-form-urlencoded";
-                            req2.Method = "GET";
-                            HttpWebResponse resp2 = (HttpWebResponse)req.GetResponse();
-                            Stream dataStream2 = resp.GetResponseStream();
+                            Uri prefix = new Uri(QueueUrl);
+                            Uri PrintUrl = new Uri(prefix, strPrint);
+                            string print = req.GetUrl(PrintUrl.AbsoluteUri);
                         }
                         // 获取取到的号
                         Match mc6 = Regex.Match(strResult, pattern6);
@@ -377,6 +319,62 @@ namespace AutoQueue
         {
             Form frm = new About();
             frm.ShowDialog();
+        }
+    }
+
+    public class InternetRequest
+    {
+        protected System.Net.CookieCollection ckCollection = null;
+
+        public InternetRequest()
+        {
+            // cookie容器
+            ckCollection = new CookieCollection();
+        }
+
+        public string PostToUrl(string strUrl, string strParams)
+        {
+            // 添加Cookie
+            CookieContainer cc = new CookieContainer();
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(strUrl);
+            req.CookieContainer = cc;
+            req.CookieContainer.Add(ckCollection);
+            // 设置POST相关参数
+            byte[] param = System.Text.Encoding.GetEncoding("gb2312").GetBytes(strParams);
+            req.ContentType = "application/x-www-form-urlencoded";
+            req.Method = "POST";
+            req.ContentLength = param.Length;
+            req.AllowAutoRedirect = false;
+            Stream webStream = req.GetRequestStream();
+            webStream.Write(param, 0, param.Length);
+            webStream.Close();
+            // 获得网站返回内容
+            HttpWebResponse response = (HttpWebResponse)req.GetResponse();
+            // 保存Cookie
+            ckCollection.Add(response.Cookies);
+            Stream dataStream = response.GetResponseStream();
+            StreamReader reader = new StreamReader(dataStream, Encoding.GetEncoding("gb2312"));
+            string result = reader.ReadToEnd();
+            return result;
+        }
+        public string GetUrl(string strUrl)
+        {
+            // 添加Cookie
+            CookieContainer cc = new CookieContainer();
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(strUrl);
+            req.CookieContainer = cc;
+            req.CookieContainer.Add(ckCollection);
+            req.Method = "GET";
+            // 防止重定向无法获取Cookie
+            req.AllowAutoRedirect = false;
+            // 获得网站返回内容
+            HttpWebResponse response = (HttpWebResponse)req.GetResponse();
+            // 添加Cookie
+            ckCollection.Add(response.Cookies);
+            Stream dataStream = response.GetResponseStream();
+            StreamReader reader = new StreamReader(dataStream, Encoding.GetEncoding("gb2312"));
+            string result = reader.ReadToEnd();
+            return result;
         }
     }
 }
