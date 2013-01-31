@@ -307,6 +307,15 @@ namespace AutoQueue
                         if (mc != null)
                         {
                             string strPrint = mc5.Groups["key"].Value;
+                            CookieContainer cc2 = new CookieContainer();
+                            HttpWebRequest req2 = (HttpWebRequest)WebRequest.Create(QueueUrl);
+                            //req.UserAgent = "Mozilla/5.0 (Windows NT 6.1; rv:18.0) Gecko/20100101 Firefox/18.0";
+                            req2.CookieContainer = cc2;
+                            req2.CookieContainer.Add(ckCollection);
+                            req2.ContentType = "application/x-www-form-urlencoded";
+                            req2.Method = "GET";
+                            HttpWebResponse resp2 = (HttpWebResponse)req.GetResponse();
+                            Stream dataStream2 = resp.GetResponseStream();
                         }
                         // 获取取到的号
                         Match mc6 = Regex.Match(strResult, pattern6);
