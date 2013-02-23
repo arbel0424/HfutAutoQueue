@@ -25,8 +25,14 @@ namespace AutoQueue
         delegate void SetTextCallback(string text);
         delegate void SetButtonCallback(bool bStatus);
         protected string strNumResult;
+
+        // 使用TraceSource记录日志
+        private static TraceSource mySource = new TraceSource("HfutQueueLog");
         
         public InternetRequest req = new InternetRequest();
+
+        private const int MAXREQUESTCOUNT = 5000;
+        private const int MINREQUESTCOUNT = 5;
 
 
         public QueueForm()
@@ -34,11 +40,15 @@ namespace AutoQueue
             InitializeComponent();
 
             // 添加测试代码
-            System.Diagnostics.Trace.Listeners.Clear();
-            System.Diagnostics.Trace.AutoFlush = true;
-            Debug.Listeners.Add(
-                new System.Diagnostics.TextWriterTraceListener("log.txt"));
-            Trace.Listeners.Add(new System.Diagnostics.TextWriterTraceListener("log.txt"));
+            // 使用TraceSource
+            mySource.Switch = new SourceSwitch("sourceSwitch", "Error");
+            mySource.Listeners.Remove("Default");
+            mySource.Switch.Level = SourceLevels.All;
+            // 添加文件记录
+            TextWriterTraceListener textListener = new TextWriterTraceListener("log.txt");
+            textListener.TraceOutputOptions = TraceOptions.DateTime; // | TraceOptions.Callstack;
+            textListener.Filter = new EventTypeFilter(SourceLevels.Information);
+            mySource.Listeners.Add(textListener);
 
             // cookie容器
             ckCollection = new CookieCollection();
@@ -46,15 +56,25 @@ namespace AutoQueue
             gM = new Mutex(true, "QueueMutex");
             StopButton.Enabled = false;
             InfoText.Text = "当前状态-空闲";
+
+            mySource.TraceInformation("程序启动");
         }
 
         private void StartButton_Click(object sender, EventArgs e)
         {
             // 尝试验证输入的用户名密码
+            if (UserNameText.Text.Length == 0 || PasswordText.Text.Length == 0)
+            {
+                MessageBox.Show("请输入用户名和密码", "错误");
+                return;
+            }
             ResetButtonStatus(false);
             UpdateInfo("验证用户名密码...");
             if (Login(UserNameText.Text, PasswordText.Text))
+            {
                 UpdateInfo("验证成功!");
+                mySource.TraceInformation("验证用户名密码成功");
+            }
             else
             {
                 UpdateInfo("用户名或密码错误，请验证后重试");
@@ -80,6 +100,7 @@ namespace AutoQueue
             if (current.Hour < 8 || current.Hour > 16)
             {
                 // 非取票时间，等待取票开始
+                mySource.TraceInformation("非取票时间，等待取票开始");
                 target = DateTime.Now;
                 if (current.Hour > 16)
                 {
@@ -107,8 +128,14 @@ namespace AutoQueue
                 }
             }
             // 直接取当天的票
+            mySource.TraceInformation("开始取票");
             int i = 0;
-            while (i < 5000)
+            int MaxTryCount = MAXREQUESTCOUNT;
+            bool bStatus = false;
+            current = DateTime.Now;
+            if (current.Hour > 9)
+                MaxTryCount = MINREQUESTCOUNT;
+            while (i < MaxTryCount)
             {
                 i++;
                 gM.WaitOne();
@@ -116,10 +143,25 @@ namespace AutoQueue
                 {
                     UpdateInfo("提交请求...");
                     if (PostRequest())
+                    {
+                        bStatus = true;
                         break;
+                    }
                 }
+
                 gM.ReleaseMutex();
                 Thread.Sleep(1000);
+            }
+            if (!bStatus)
+            {
+                // 取票失败
+                mySource.TraceInformation("取票失败");
+                if (MaxTryCount == MINREQUESTCOUNT)
+                {
+                    UpdateInfo("取票失败,请检查今天是否可以取票");
+                }
+                else
+                    UpdateInfo("取票失败");
             }
             // 恢复控件状态
             ResetButtonStatus(true);
@@ -168,18 +210,25 @@ namespace AutoQueue
             try
             {
                 string result = req.PostToUrl(LoginUrl, postData);
-                if ( result.IndexOf("密码错误") == -1)
+                if (result.IndexOf("密码错误") == -1)
+                {
                     return true;
+                }
                 else
+                {
+                    mySource.TraceInformation("登录密码错误");
                     return false;
+                }
             }
             catch (WebException we)
             {
                 string msg = we.Message;
+                mySource.TraceEvent(TraceEventType.Error, 15, msg);
                 return false;
             }
             catch
             {
+                mySource.TraceEvent(TraceEventType.Error, 16, "访问网页出现未知错误");
                 return false;
             }
         }
@@ -206,27 +255,42 @@ namespace AutoQueue
                 if (mc1 != null)
                     strViewState = mc1.Groups["key"].Value;
                 else
+                {
+                    mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
+                    mySource.TraceEvent(TraceEventType.Error, 20, pattern1);
+                    mySource.TraceEvent(TraceEventType.Error, 20, result);
                     return false;
+                }
                 Match mc2 = Regex.Match(result, pattern2);
                 if (mc2 != null)
                     strValidation = mc2.Groups["key"].Value;
                 else
+                {
+                    mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
+                    mySource.TraceEvent(TraceEventType.Error, 20, pattern2);
+                    mySource.TraceEvent(TraceEventType.Error, 20, result);
                     return false;
+                }
                 Match mc3 = Regex.Match(result, pattern3);
                 if (mc3 != null)
                     strListID = mc3.Groups["key"].Value;
                 else
+                {
+                    mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
+                    mySource.TraceEvent(TraceEventType.Error, 20, pattern3);
+                    mySource.TraceEvent(TraceEventType.Error, 20, result);
                     return false;
+                }
             }
             catch (WebException we)
             {
                 string msg = we.Message;
-                Trace.Write(msg);
+                mySource.TraceEvent(TraceEventType.Error, 25, msg);
                 return false;
             }
             catch
             {
-                Trace.WriteLine("获取网页提交参数时发生未知错误");
+                mySource.TraceEvent(TraceEventType.Error, 26, "获取网页提交参数时发生未知错误");
                 return false;
             }
 
@@ -251,6 +315,7 @@ namespace AutoQueue
                     if (strResult.IndexOf("取号成功") != -1)
                     {
                         // 访问打印页面
+                        mySource.TraceInformation(strResult);
                         Match mc5 = Regex.Match(result, pattern5);
                         if (mc != null)
                         {
@@ -259,12 +324,25 @@ namespace AutoQueue
                             Uri PrintUrl = new Uri(prefix, strPrint);
                             string print = req.GetUrl(PrintUrl.AbsoluteUri);
                         }
+                        else
+                        {
+                            mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
+                            mySource.TraceEvent(TraceEventType.Error, 20, pattern5);
+                            mySource.TraceEvent(TraceEventType.Error, 20, result);
+                        }
                         // 获取取到的号
                         Match mc6 = Regex.Match(strResult, pattern6);
                         if (mc != null)
                         {
+                            mySource.TraceInformation(strResult);
                             string strNum = mc6.Groups["key"].Value;
                             UpdateResult(strNum);
+                        }
+                        else
+                        {
+                            mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
+                            mySource.TraceEvent(TraceEventType.Error, 20, pattern6);
+                            mySource.TraceEvent(TraceEventType.Error, 20, result);
                         }
                         return true;
                     }
@@ -272,26 +350,34 @@ namespace AutoQueue
                     {
                         // 获取已经取到的号
                         UpdateInfo("已经取过号");
+                        mySource.TraceInformation(strResult);
                         Match mc7 = Regex.Match(result, pattern7);
                         if (mc != null)
                         {
                             string strNum = mc7.Groups["key"].Value;
                             UpdateResult(strNum);
                         }
+                        else
+                        {
+                            mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
+                            mySource.TraceEvent(TraceEventType.Error, 20, pattern7);
+                            mySource.TraceEvent(TraceEventType.Error, 20, result);
+                        }
                         return true;
                     }
                 }
                 else
                 {
-                    Trace.WriteLine("无法解析网页内容");
-                    Trace.Write(result);
+                    mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
+                    mySource.TraceEvent(TraceEventType.Error, 20, pattern4);
+                    mySource.TraceEvent(TraceEventType.Error, 20, result);
                     return false;
                 }
             }
             catch (WebException we)
             {
                 string msg = we.Message;
-                Trace.WriteLine(msg);
+                mySource.TraceEvent(TraceEventType.Error, 27, msg);
                 return false;
             }
 

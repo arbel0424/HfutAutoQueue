@@ -151,6 +151,7 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.Title);
             this.Name = "QueueForm";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "财务报账排队助手-0.2Beta";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.QueueForm_FormClosed);
             this.ResumeLayout(false);
