@@ -345,6 +345,7 @@ namespace AutoQueue
             req.Method = "POST";
             req.ContentLength = param.Length;
             req.AllowAutoRedirect = false;
+            req.Timeout = 5000;
             Stream webStream = req.GetRequestStream();
             webStream.Write(param, 0, param.Length);
             webStream.Close();
@@ -367,6 +368,7 @@ namespace AutoQueue
             req.Method = "GET";
             // 防止重定向无法获取Cookie
             req.AllowAutoRedirect = false;
+            req.Timeout = 5000;
             // 获得网站返回内容
             HttpWebResponse response = (HttpWebResponse)req.GetResponse();
             // 添加Cookie
