@@ -38,6 +38,10 @@
             this.InfoText = new System.Windows.Forms.Label();
             this.ResultText = new System.Windows.Forms.Label();
             this.AboutButton = new System.Windows.Forms.Button();
+            this.NumLimit = new System.Windows.Forms.TrackBar();
+            this.label3 = new System.Windows.Forms.Label();
+            this.LimitInfo = new System.Windows.Forms.Label();
+            ((System.ComponentModel.ISupportInitialize)(this.NumLimit)).BeginInit();
             this.SuspendLayout();
             // 
             // Title
@@ -107,7 +111,7 @@
             // 
             this.InfoText.AutoSize = true;
             this.InfoText.Font = new System.Drawing.Font("宋体", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.InfoText.Location = new System.Drawing.Point(1, 214);
+            this.InfoText.Location = new System.Drawing.Point(3, 244);
             this.InfoText.Name = "InfoText";
             this.InfoText.Size = new System.Drawing.Size(63, 14);
             this.InfoText.TabIndex = 4;
@@ -127,7 +131,7 @@
             // 
             // AboutButton
             // 
-            this.AboutButton.Location = new System.Drawing.Point(231, 211);
+            this.AboutButton.Location = new System.Drawing.Point(234, 235);
             this.AboutButton.Name = "AboutButton";
             this.AboutButton.Size = new System.Drawing.Size(53, 23);
             this.AboutButton.TabIndex = 5;
@@ -135,11 +139,41 @@
             this.AboutButton.UseVisualStyleBackColor = true;
             this.AboutButton.Click += new System.EventHandler(this.AboutButton_Click);
             // 
+            // NumLimit
+            // 
+            this.NumLimit.LargeChange = 1;
+            this.NumLimit.Location = new System.Drawing.Point(70, 192);
+            this.NumLimit.Name = "NumLimit";
+            this.NumLimit.Size = new System.Drawing.Size(164, 45);
+            this.NumLimit.TabIndex = 6;
+            this.NumLimit.Scroll += new System.EventHandler(this.NumLimit_Scroll);
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(13, 197);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(53, 12);
+            this.label3.TabIndex = 7;
+            this.label3.Text = "取指定号";
+            // 
+            // LimitInfo
+            // 
+            this.LimitInfo.AutoSize = true;
+            this.LimitInfo.Location = new System.Drawing.Point(102, 225);
+            this.LimitInfo.Name = "LimitInfo";
+            this.LimitInfo.Size = new System.Drawing.Size(41, 12);
+            this.LimitInfo.TabIndex = 8;
+            this.LimitInfo.Text = "最前号";
+            // 
             // QueueForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(286, 237);
+            this.ClientSize = new System.Drawing.Size(286, 267);
+            this.Controls.Add(this.LimitInfo);
+            this.Controls.Add(this.label3);
+            this.Controls.Add(this.NumLimit);
             this.Controls.Add(this.AboutButton);
             this.Controls.Add(this.InfoText);
             this.Controls.Add(this.StopButton);
@@ -154,6 +188,7 @@
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "财务报账排队助手-0.2Beta";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.QueueForm_FormClosed);
+            ((System.ComponentModel.ISupportInitialize)(this.NumLimit)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -171,6 +206,9 @@
         private System.Windows.Forms.Label InfoText;
         private System.Windows.Forms.Label ResultText;
         private System.Windows.Forms.Button AboutButton;
+        private System.Windows.Forms.TrackBar NumLimit;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.Label LimitInfo;
     }
 }
 

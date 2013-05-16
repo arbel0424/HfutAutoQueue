@@ -25,10 +25,11 @@ namespace AutoQueue
         delegate void SetTextCallback(string text);
         delegate void SetButtonCallback(bool bStatus);
         protected string strNumResult;
+        protected int nSkipNum;
 
         // 使用TraceSource记录日志
         private static TraceSource mySource = new TraceSource("HfutQueueLog");
-        
+
         public InternetRequest req = new InternetRequest();
 
         private const int MAXREQUESTCOUNT = 5000;
@@ -56,6 +57,8 @@ namespace AutoQueue
             gM = new Mutex(true, "QueueMutex");
             StopButton.Enabled = false;
             InfoText.Text = "当前状态-空闲";
+            NumLimit.Value = 0;
+            LimitInfo.Text = "取最前号";
 
             mySource.TraceInformation("程序启动");
         }
@@ -82,6 +85,7 @@ namespace AutoQueue
                 PasswordText.Text = "";
                 return;
             }
+            nSkipNum = NumLimit.Value;
             if (null == this.runThread)
             {
                 this.runThread = new Thread(new ThreadStart(this.OnTimeRun));
@@ -90,51 +94,116 @@ namespace AutoQueue
             gM.ReleaseMutex();
         }
 
-        public void OnTimeRun()
+        public void WaitNextDay()
         {
+            string strTime;
             DateTime target;
             DateTime current;
             TimeSpan ts;
-            string strTime;
+
+            // 非取票时间，等待取票开始
             current = DateTime.Now;
-            if (current.Hour < 8 || current.Hour > 16)
+            mySource.TraceInformation("非取票时间，等待取票开始");
+            target = DateTime.Now;
+            if (current.Hour > 9)
             {
-                // 非取票时间，等待取票开始
-                mySource.TraceInformation("非取票时间，等待取票开始");
-                target = DateTime.Now;
-                if (current.Hour > 16)
+                // 取的是明天的票
+                target = target.AddDays(1);
+            }
+            strTime = target.ToLongDateString() + " 08:00:00";
+            //strTime = target.ToLongDateString() + " 00:12:00";
+            target = DateTime.Parse(strTime);
+            while (true)
+            {
+                gM.WaitOne();
+                current = DateTime.Now;
+                ts = target.Subtract(current);
+                if (ts.TotalMinutes < 5)
                 {
-                    // 取的是明天的票
-                    target = target.AddDays(1);
-                }
-                strTime = target.ToLongDateString() + " 08:00:00";
-                //strTime = target.ToLongDateString() + " 00:12:00";
-                target = DateTime.Parse(strTime);
-                while (true)
-                {
-                    gM.WaitOne();
-                    current = DateTime.Now;
-                    ts = target.Subtract(current);
-                    if (ts.TotalMinutes < 5)
-                    {
-                        gM.ReleaseMutex();
-                        break;
-                    }
-                    strTime = "离取票时间还有" + ts.Hours.ToString() + "小时"
-                        + ts.Minutes + "分钟" + ts.Seconds + "秒";
-                    UpdateInfo(strTime);
                     gM.ReleaseMutex();
+                    break;
+                }
+                strTime = "离取票时间还有" + ts.Hours.ToString() + "小时"
+                    + ts.Minutes + "分钟" + ts.Seconds + "秒";
+                UpdateInfo(strTime);
+                gM.ReleaseMutex();
+                Thread.Sleep(1000);
+            }
+
+        }
+
+        public bool SkipTicket()
+        {
+            // 在特定序号过去后才取号
+
+            string pattern1 = @"<span\sid=""Repeater1_ctl00_Literal1""\sclass=""txt"">(?<key>.+)</span>";
+            int nPreNum = 0;
+            int nNum = 0;
+            int nChange = 0;
+            int nCount = 0;
+
+            UpdateInfo("跳过特定序号...");
+            while (nCount < 100 && nChange < 10)
+            {
+                if (Login(UserNameText.Text, PasswordText.Text))
+                {
+                    string page = req.GetUrl(QueueUrl);
+                    Match mc = Regex.Match(page, pattern1);
+                    if (mc.Success)
+                    {
+                        string info = mc.Groups["key"].Value;
+                        int nStart = info.IndexOf('[');
+                        int nEnd = info.IndexOf(']');
+                        string strNum = info.Substring(nStart+1, nEnd-nStart-1);
+                        nPreNum = nNum;
+                        nNum = Convert.ToInt16(strNum);
+                        if (nPreNum == nNum)
+                        {
+                            nChange++;
+                        }
+                        else
+                        {
+                            nChange = 0;
+                        }
+                        if (nSkipNum < nNum)
+                        {
+                            return true;
+                        }
+                    }
                     Thread.Sleep(1000);
                 }
             }
-            // 直接取当天的票
+            return false;
+        }
+
+        public void OnTimeRun()
+        {
+            DateTime current;
+            string pattern0 = @"综合报销业务取号暂停办理";
+
+            string page = req.GetUrl(QueueUrl);
+            // 首先获得网页内容
+            if (page.IndexOf(pattern0) != -1)
+            {
+                // 今天不能取票，取明天的票
+                WaitNextDay();
+            }
+
+            // 开始取票
+            if (nSkipNum != 0)
+            {
+                // 如果设置了定点取票，则等待特定时间
+                SkipTicket();
+            }
             mySource.TraceInformation("开始取票");
+            // 设置最大取票次数
             int i = 0;
             int MaxTryCount = MAXREQUESTCOUNT;
             bool bStatus = false;
             current = DateTime.Now;
             if (current.Hour > 9)
                 MaxTryCount = MINREQUESTCOUNT;
+
             while (i < MaxTryCount)
             {
                 i++;
@@ -202,6 +271,7 @@ namespace AutoQueue
                 PasswordText.Enabled = bStatus;
                 StartButton.Enabled = bStatus;
                 StopButton.Enabled = !bStatus;
+                NumLimit.Enabled = bStatus;
             }
         }
         public bool Login(string strUid, string strPwd)
@@ -237,22 +307,24 @@ namespace AutoQueue
             string strViewState = null;
             string strValidation = null;
             string strResult = null;
-            string strListID = null;
             string pattern1 = @"id=""__VIEWSTATE""\svalue=""(?<key>.+)""";
             string pattern2 = @"id=""__EVENTVALIDATION""\svalue=""(?<key>.+)""";
-            string pattern3 = @"<option\s.*value=""(?<key>.+)""";
+            //string pattern3 = @"<option\s.*value=""(?<key>.+)""";
+            //string pattern4 = @"javascript'>alert\('(?<key>.+)'\)";
+            // 可能改变了提示对话框的方式
             string pattern4 = @"javascript'>alert\('(?<key>.+)'\)";
             string pattern5 = @"window\.location='(?<key>.+)'";
             string pattern6 = @"\[.+\].+\[(?<key>.+)\]";
             string pattern7 = @"\[综合报销业务].+\[(?<key>.+)\]";
-            string paramPattern = @"__VIEWSTATE={0}&__EVENTVALIDATION={1}&ImageButton1.x={2}&ImageButton1.y={3}&DropDownList2={4}&deptID=1&dateType=Today&timeType=AM";
+            string paramPattern = @"__VIEWSTATE={0}&__EVENTVALIDATION={1}&Repeater1$ctl00$ImageButton1.x={2}&Repeater1$ctl00$ImageButton1.y={3}&deptID=1&dateType=Today&timeType=AM";
 
             try
             {
                 string result = req.GetUrl(QueueUrl);
                 // 利用正则进行提取
+                // 获得__VIEWSTATE
                 Match mc1 = Regex.Match(result, pattern1);
-                if (mc1 != null)
+                if (mc1.Success)
                     strViewState = mc1.Groups["key"].Value;
                 else
                 {
@@ -261,8 +333,9 @@ namespace AutoQueue
                     mySource.TraceEvent(TraceEventType.Error, 20, result);
                     return false;
                 }
+                // 获得__EVENTVALIDATION
                 Match mc2 = Regex.Match(result, pattern2);
-                if (mc2 != null)
+                if (mc2.Success)
                     strValidation = mc2.Groups["key"].Value;
                 else
                 {
@@ -271,16 +344,16 @@ namespace AutoQueue
                     mySource.TraceEvent(TraceEventType.Error, 20, result);
                     return false;
                 }
-                Match mc3 = Regex.Match(result, pattern3);
-                if (mc3 != null)
-                    strListID = mc3.Groups["key"].Value;
-                else
-                {
-                    mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
-                    mySource.TraceEvent(TraceEventType.Error, 20, pattern3);
-                    mySource.TraceEvent(TraceEventType.Error, 20, result);
-                    return false;
-                }
+                //Match mc3 = Regex.Match(result, pattern3);
+                //if (mc3.Success)
+                //    strListID = mc3.Groups["key"].Value;
+                //else
+                //{
+                //    mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
+                //    mySource.TraceEvent(TraceEventType.Error, 20, pattern3);
+                //    mySource.TraceEvent(TraceEventType.Error, 20, result);
+                //    return false;
+                //}
             }
             catch (WebException we)
             {
@@ -301,23 +374,23 @@ namespace AutoQueue
             strValidation = HttpUtility.UrlEncode(strValidation);
             strViewState = HttpUtility.UrlEncode(strViewState);
             string postData = string.Format(paramPattern, strViewState,
-                                        strValidation, x, y, strListID);
+                                        strValidation, x, y);
             // 提交请求
             try
             {
                 string result = req.PostToUrl(QueueUrl, postData);
 
-                Match mc = Regex.Match(result, pattern4);
-                if (mc != null)
+                Match mc4 = Regex.Match(result, pattern4);
+                if (mc4.Success)
                 {
-                    strResult = mc.Groups["key"].Value;
+                    strResult = mc4.Groups["key"].Value;
                     UpdateInfo(strResult);
                     if (strResult.IndexOf("取号成功") != -1)
                     {
                         // 访问打印页面
                         mySource.TraceInformation(strResult);
                         Match mc5 = Regex.Match(result, pattern5);
-                        if (mc != null)
+                        if (mc5.Success)
                         {
                             string strPrint = mc5.Groups["key"].Value;
                             Uri prefix = new Uri(QueueUrl);
@@ -332,7 +405,7 @@ namespace AutoQueue
                         }
                         // 获取取到的号
                         Match mc6 = Regex.Match(strResult, pattern6);
-                        if (mc != null)
+                        if (mc6.Success)
                         {
                             mySource.TraceInformation(strResult);
                             string strNum = mc6.Groups["key"].Value;
@@ -352,7 +425,7 @@ namespace AutoQueue
                         UpdateInfo("已经取过号");
                         mySource.TraceInformation(strResult);
                         Match mc7 = Regex.Match(result, pattern7);
-                        if (mc != null)
+                        if (mc7.Success)
                         {
                             string strNum = mc7.Groups["key"].Value;
                             UpdateResult(strNum);
@@ -405,6 +478,16 @@ namespace AutoQueue
         {
             Form frm = new About();
             frm.ShowDialog();
+        }
+
+        private void NumLimit_Scroll(object sender, EventArgs e)
+        {
+            int nValue = NumLimit.Value * 10;
+            string strTemp = Convert.ToString(nValue) + "号以后";
+            if (nValue == 0)
+                LimitInfo.Text = "取最前号";
+            else
+                LimitInfo.Text = strTemp;
         }
     }
 
