@@ -20,6 +20,7 @@ namespace AutoQueue
         protected const string LoginUrl = "http://210.45.241.169/login_gr.aspx";
         protected const string QueueUrl = "http://210.45.241.169/baobiao/Queue/QueueSystem.aspx?deptID=1&dateType=Today&timeType=AM";
         protected const string UrlPrefix = "http://210.45.241.169/baobiao/Queue/";
+        protected const string strFilePrefix = "print";
         private Thread runThread = null;
         private Mutex gM;
         delegate void SetTextCallback(string text);
@@ -65,6 +66,14 @@ namespace AutoQueue
 
         private void StartButton_Click(object sender, EventArgs e)
         {
+            StartQueue();
+        }
+
+        /// <summary>
+        /// 开始取票函数
+        /// </summary>
+        public void StartQueue()
+        {
             // 尝试验证输入的用户名密码
             if (UserNameText.Text.Length == 0 || PasswordText.Text.Length == 0)
             {
@@ -85,7 +94,7 @@ namespace AutoQueue
                 PasswordText.Text = "";
                 return;
             }
-            nSkipNum = NumLimit.Value;
+            nSkipNum = NumLimit.Value * 10;
             if (null == this.runThread)
             {
                 this.runThread = new Thread(new ThreadStart(this.OnTimeRun));
@@ -143,7 +152,7 @@ namespace AutoQueue
             int nCount = 0;
 
             UpdateInfo("跳过特定序号...");
-            while (nCount < 100 && nChange < 10)
+            while (nCount < 100 && nChange < 1000)
             {
                 if (Login(UserNameText.Text, PasswordText.Text))
                 {
@@ -154,21 +163,16 @@ namespace AutoQueue
                         string info = mc.Groups["key"].Value;
                         int nStart = info.IndexOf('[');
                         int nEnd = info.IndexOf(']');
-                        string strNum = info.Substring(nStart+1, nEnd-nStart-1);
+                        string strNum = info.Substring(nStart + 1, nEnd - nStart - 1);
                         nPreNum = nNum;
+                        // 报销业务的票从1000开始
                         nNum = Convert.ToInt16(strNum);
-                        if (nPreNum == nNum)
-                        {
+                        if (nPreNum == nNum && nNum != 0)
                             nChange++;
-                        }
                         else
-                        {
                             nChange = 0;
-                        }
                         if (nSkipNum < nNum)
-                        {
                             return true;
-                        }
                     }
                     Thread.Sleep(1000);
                 }
@@ -226,9 +230,7 @@ namespace AutoQueue
                 // 取票失败
                 mySource.TraceInformation("取票失败");
                 if (MaxTryCount == MINREQUESTCOUNT)
-                {
                     UpdateInfo("取票失败,请检查今天是否可以取票");
-                }
                 else
                     UpdateInfo("取票失败");
             }
@@ -396,6 +398,8 @@ namespace AutoQueue
                             Uri prefix = new Uri(QueueUrl);
                             Uri PrintUrl = new Uri(prefix, strPrint);
                             string print = req.GetUrl(PrintUrl.AbsoluteUri);
+                            // 保存打印页面
+                            DownloadPrintPage(print);
                         }
                         else
                         {
@@ -489,6 +493,53 @@ namespace AutoQueue
             else
                 LimitInfo.Text = strTemp;
         }
+
+        /// <summary>下载打印页面所需要的图片</summary>
+        /// 用于离线打印表单
+        private void DownloadPicFiles()
+        {
+            const string strUrlLogo = "images/logo.png";
+            const string strUrlTitle = "images/titlebg.png";
+
+            Uri prefix = new Uri(UrlPrefix);
+            Uri uriLogo = new Uri(prefix, strUrlLogo);
+            Uri uriTitle = new Uri(prefix, strUrlTitle);
+            WebClient wbClinet = new WebClient();
+
+            // 创建相关目录
+            if (Directory.Exists(strFilePrefix) == false)
+                Directory.CreateDirectory(strFilePrefix);
+            if (Directory.Exists(strFilePrefix + "/images") == false)
+                Directory.CreateDirectory(strFilePrefix + "/images");
+
+            // 下载图片文件
+            string strFile = strFilePrefix + "/";
+            if (File.Exists(strFile + strUrlLogo) == false)
+                wbClinet.DownloadFile(uriLogo, strFile + strUrlLogo);
+            if (File.Exists(strFile + strUrlTitle) == false)
+                wbClinet.DownloadFile(uriTitle, strFile + strUrlTitle);
+        }
+
+        /// <summary>下载打印页面内容</summary>
+        private void DownloadPrintPage(string page)
+        {
+            string pattern = @"<img\sid=""BarCode_Image""\ssrc=""(?<key>.+)""\sborder=""0""\s/>";
+            string strUrl;
+            Match mc = Regex.Match(page, pattern);
+            if (mc.Success)
+                strUrl = mc.Groups["key"].Value;
+            else
+                return;
+            Uri prefix = new Uri(QueueUrl);
+            Uri ImageUrl = new Uri(prefix, strUrl);
+            string strFileName = UserNameText.Text + DateTime.Now.ToShortDateString();
+            StreamWriter file = new StreamWriter(strFilePrefix + "/" + strFileName+".html");
+            file.Write(page.Replace(strUrl, strFileName + ".jpg"));
+            file.Close();
+            // 下载二维码图片
+            Image img = req.DownloadImg(ImageUrl.AbsoluteUri);
+            img.Save(strFilePrefix + "/" + strFileName + ".jpg");
+        }
     }
 
     public class InternetRequest
@@ -546,6 +597,27 @@ namespace AutoQueue
             StreamReader reader = new StreamReader(dataStream, Encoding.GetEncoding("gb2312"));
             string result = reader.ReadToEnd();
             return result;
+        }
+        public Image DownloadImg(string strUrl)
+        {
+            Image img;
+            // 添加Cookie
+            CookieContainer cc = new CookieContainer();
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(strUrl);
+            req.CookieContainer = cc;
+            req.CookieContainer.Add(ckCollection);
+            req.Method = "GET";
+            // 防止重定向无法获取Cookie
+            //req.AllowAutoRedirect = false;
+            req.Timeout = 5000;
+            // 获得网站返回内容
+            HttpWebResponse response = (HttpWebResponse)req.GetResponse();
+            // 添加Cookie
+            ckCollection.Add(response.Cookies);
+            Stream dataStream = response.GetResponseStream();
+            img = Image.FromStream(dataStream);
+
+            return img;
         }
     }
 }
