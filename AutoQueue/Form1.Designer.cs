@@ -131,7 +131,7 @@
             // 
             // AboutButton
             // 
-            this.AboutButton.Location = new System.Drawing.Point(234, 235);
+            this.AboutButton.Location = new System.Drawing.Point(230, 238);
             this.AboutButton.Name = "AboutButton";
             this.AboutButton.Size = new System.Drawing.Size(53, 23);
             this.AboutButton.TabIndex = 5;
@@ -186,7 +186,7 @@
             this.Controls.Add(this.Title);
             this.Name = "QueueForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "财务报账排队助手-0.2Beta";
+            this.Text = "财务报账排队助手-0.3Beta";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.QueueForm_FormClosed);
             ((System.ComponentModel.ISupportInitialize)(this.NumLimit)).EndInit();
             this.ResumeLayout(false);

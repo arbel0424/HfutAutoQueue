@@ -40,6 +40,7 @@ namespace AutoQueue
         public QueueForm()
         {
             InitializeComponent();
+            DownloadPicFiles();
 
             // 添加测试代码
             // 使用TraceSource
@@ -67,6 +68,23 @@ namespace AutoQueue
         private void StartButton_Click(object sender, EventArgs e)
         {
             StartQueue();
+
+
+            //// 尝试验证输入的用户名密码
+            //if (UserNameText.Text.Length == 0 || PasswordText.Text.Length == 0)
+            //{
+            //    MessageBox.Show("请输入用户名和密码", "错误");
+            //    return;
+            //}
+            //UpdateInfo("验证用户名密码...");
+            //if (Login(UserNameText.Text, PasswordText.Text))
+            //{
+            //    UpdateInfo("验证成功!");
+            //    mySource.TraceInformation("验证用户名密码成功");
+            //}
+            //string strPage = File.ReadAllText("test.htm", Encoding.GetEncoding("GBK"));
+            //DownloadPrintPage(strPage);
+
         }
 
         /// <summary>
@@ -311,9 +329,6 @@ namespace AutoQueue
             string strResult = null;
             string pattern1 = @"id=""__VIEWSTATE""\svalue=""(?<key>.+)""";
             string pattern2 = @"id=""__EVENTVALIDATION""\svalue=""(?<key>.+)""";
-            //string pattern3 = @"<option\s.*value=""(?<key>.+)""";
-            //string pattern4 = @"javascript'>alert\('(?<key>.+)'\)";
-            // 可能改变了提示对话框的方式
             string pattern4 = @"javascript'>alert\('(?<key>.+)'\)";
             string pattern5 = @"window\.location='(?<key>.+)'";
             string pattern6 = @"\[.+\].+\[(?<key>.+)\]";
@@ -346,16 +361,6 @@ namespace AutoQueue
                     mySource.TraceEvent(TraceEventType.Error, 20, result);
                     return false;
                 }
-                //Match mc3 = Regex.Match(result, pattern3);
-                //if (mc3.Success)
-                //    strListID = mc3.Groups["key"].Value;
-                //else
-                //{
-                //    mySource.TraceEvent(TraceEventType.Error, 20, "正则解析失败");
-                //    mySource.TraceEvent(TraceEventType.Error, 20, pattern3);
-                //    mySource.TraceEvent(TraceEventType.Error, 20, result);
-                //    return false;
-                //}
             }
             catch (WebException we)
             {
@@ -509,8 +514,12 @@ namespace AutoQueue
             // 创建相关目录
             if (Directory.Exists(strFilePrefix) == false)
                 Directory.CreateDirectory(strFilePrefix);
+            if (Directory.Exists(strFilePrefix) == false)
+                return;
             if (Directory.Exists(strFilePrefix + "/images") == false)
                 Directory.CreateDirectory(strFilePrefix + "/images");
+            if (Directory.Exists(strFilePrefix + "/images") == false)
+                return;
 
             // 下载图片文件
             string strFile = strFilePrefix + "/";
@@ -523,6 +532,7 @@ namespace AutoQueue
         /// <summary>下载打印页面内容</summary>
         private void DownloadPrintPage(string page)
         {
+            //string pattern = @"<img\sid=""BarCode_Image""\ssrc=""(?<key>.+)""\sstyle=""border-width:0px;""\s/>";
             string pattern = @"<img\sid=""BarCode_Image""\ssrc=""(?<key>.+)""\sborder=""0""\s/>";
             string strUrl;
             Match mc = Regex.Match(page, pattern);
@@ -532,13 +542,22 @@ namespace AutoQueue
                 return;
             Uri prefix = new Uri(QueueUrl);
             Uri ImageUrl = new Uri(prefix, strUrl);
-            string strFileName = UserNameText.Text + DateTime.Now.ToShortDateString();
-            StreamWriter file = new StreamWriter(strFilePrefix + "/" + strFileName+".html");
+            string strFileName = UserNameText.Text + "-" + DateTime.Now.ToString("MMdd");
+            string strSaveName;
+            if (Directory.Exists(strFilePrefix) == true)
+                strSaveName = strFilePrefix + "/" + strFileName + ".html";
+            else
+                strSaveName = strFileName + ".html";
+            StreamWriter file = new StreamWriter(strSaveName, false, Encoding.GetEncoding("gbk"));
             file.Write(page.Replace(strUrl, strFileName + ".jpg"));
             file.Close();
             // 下载二维码图片
             Image img = req.DownloadImg(ImageUrl.AbsoluteUri);
-            img.Save(strFilePrefix + "/" + strFileName + ".jpg");
+            if (Directory.Exists(strFilePrefix) == true)
+                strSaveName = strFilePrefix + "/" + strFileName + ".jpg";
+            else
+                strSaveName = strFileName + ".jpg";
+            img.Save(strSaveName);
         }
     }
 
