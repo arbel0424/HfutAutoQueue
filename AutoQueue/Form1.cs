@@ -172,7 +172,7 @@ namespace AutoQueue
             UpdateInfo("跳过特定序号...");
             while (nCount < 100 && nChange < 1000)
             {
-                if (Login(UserNameText.Text, PasswordText.Text))
+                try
                 {
                     string page = req.GetUrl(QueueUrl);
                     Match mc = Regex.Match(page, pattern1);
@@ -193,6 +193,11 @@ namespace AutoQueue
                             return true;
                     }
                     Thread.Sleep(1000);
+                }
+                catch (WebException we)
+                {
+                    string msg = we.Message;
+                    mySource.TraceEvent(TraceEventType.Error, 11, msg);
                 }
             }
             return false;
