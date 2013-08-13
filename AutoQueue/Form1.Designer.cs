@@ -41,7 +41,11 @@
             this.NumLimit = new System.Windows.Forms.TrackBar();
             this.label3 = new System.Windows.Forms.Label();
             this.LimitInfo = new System.Windows.Forms.Label();
+            this.picture = new System.Windows.Forms.PictureBox();
+            this.CodeResult = new System.Windows.Forms.Label();
+            this.CodeLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.NumLimit)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.picture)).BeginInit();
             this.SuspendLayout();
             // 
             // Title
@@ -111,7 +115,7 @@
             // 
             this.InfoText.AutoSize = true;
             this.InfoText.Font = new System.Drawing.Font("宋体", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.InfoText.Location = new System.Drawing.Point(3, 244);
+            this.InfoText.Location = new System.Drawing.Point(3, 280);
             this.InfoText.Name = "InfoText";
             this.InfoText.Size = new System.Drawing.Size(63, 14);
             this.InfoText.TabIndex = 4;
@@ -131,7 +135,7 @@
             // 
             // AboutButton
             // 
-            this.AboutButton.Location = new System.Drawing.Point(230, 238);
+            this.AboutButton.Location = new System.Drawing.Point(221, 277);
             this.AboutButton.Name = "AboutButton";
             this.AboutButton.Size = new System.Drawing.Size(53, 23);
             this.AboutButton.TabIndex = 5;
@@ -141,6 +145,7 @@
             // 
             // NumLimit
             // 
+            this.NumLimit.Enabled = false;
             this.NumLimit.LargeChange = 1;
             this.NumLimit.Location = new System.Drawing.Point(70, 192);
             this.NumLimit.Name = "NumLimit";
@@ -166,11 +171,39 @@
             this.LimitInfo.TabIndex = 8;
             this.LimitInfo.Text = "最前号";
             // 
+            // picture
+            // 
+            this.picture.Location = new System.Drawing.Point(54, 243);
+            this.picture.Name = "picture";
+            this.picture.Size = new System.Drawing.Size(58, 21);
+            this.picture.TabIndex = 9;
+            this.picture.TabStop = false;
+            // 
+            // CodeResult
+            // 
+            this.CodeResult.AutoSize = true;
+            this.CodeResult.Location = new System.Drawing.Point(155, 264);
+            this.CodeResult.Name = "CodeResult";
+            this.CodeResult.Size = new System.Drawing.Size(0, 12);
+            this.CodeResult.TabIndex = 8;
+            // 
+            // CodeLabel
+            // 
+            this.CodeLabel.AutoSize = true;
+            this.CodeLabel.Location = new System.Drawing.Point(135, 252);
+            this.CodeLabel.Name = "CodeLabel";
+            this.CodeLabel.Size = new System.Drawing.Size(29, 12);
+            this.CodeLabel.TabIndex = 10;
+            this.CodeLabel.Text = "YYYY";
+            // 
             // QueueForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(286, 267);
+            this.ClientSize = new System.Drawing.Size(286, 300);
+            this.Controls.Add(this.CodeLabel);
+            this.Controls.Add(this.picture);
+            this.Controls.Add(this.CodeResult);
             this.Controls.Add(this.LimitInfo);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.NumLimit);
@@ -186,9 +219,10 @@
             this.Controls.Add(this.Title);
             this.Name = "QueueForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "财务报账排队助手-0.3Beta";
+            this.Text = "财务报账排队助手-0.32应急版";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.QueueForm_FormClosed);
             ((System.ComponentModel.ISupportInitialize)(this.NumLimit)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.picture)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -209,6 +243,9 @@
         private System.Windows.Forms.TrackBar NumLimit;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label LimitInfo;
+        private System.Windows.Forms.PictureBox picture;
+        private System.Windows.Forms.Label CodeResult;
+        private System.Windows.Forms.Label CodeLabel;
     }
 }
 

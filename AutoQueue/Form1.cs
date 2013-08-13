@@ -28,6 +28,20 @@ namespace AutoQueue
         protected string strNumResult;
         protected int nSkipNum;
 
+        protected int[] ModelLength = { 7, 4, 7, 7, 8, 7, 7, 7, 7, 7 };
+        protected int[,] ModelData = { 
+            {4080, 1020, 1020, 1020, 1020, 1020, 4080,    0},
+            { 510,  510,  510, 6120,    0,    0,    0,    0},
+            {1020, 1530, 1530, 1530, 1530, 2550, 2040,    0},
+            {1530, 1020, 1530, 1530, 2040, 3060, 1530,    0},
+            {1020, 1020, 1020, 1530, 1020, 1020, 6120,  510},
+            {2040, 2550, 1530, 1530, 1530, 1530, 2550,    0},
+            {4080, 1530, 1530, 1530, 1530, 1530, 2550,    0},
+            { 510,  510, 2040, 2550, 1530, 1530, 510,    0},
+            {2550, 2040, 1530, 1530, 1530, 2040, 2550,    0},
+            {2550, 1530, 1530, 1530, 1530, 1530, 4080,    0}
+        };
+
         // 使用TraceSource记录日志
         private static TraceSource mySource = new TraceSource("HfutQueueLog");
 
@@ -68,6 +82,7 @@ namespace AutoQueue
         private void StartButton_Click(object sender, EventArgs e)
         {
             StartQueue();
+            //Test();
 
 
             //// 尝试验证输入的用户名密码
@@ -209,12 +224,12 @@ namespace AutoQueue
             string pattern0 = @"综合报销业务取号暂停办理";
 
             string page = req.GetUrl(QueueUrl);
-            // 首先获得网页内容
-            if (page.IndexOf(pattern0) != -1)
-            {
-                // 今天不能取票，取明天的票
-                WaitNextDay();
-            }
+            //// 首先获得网页内容
+            //if (page.IndexOf(pattern0) != -1)
+            //{
+            //    // 今天不能取票，取明天的票
+            //    WaitNextDay();
+            //}
 
             // 开始取票
             if (nSkipNum != 0)
@@ -235,6 +250,7 @@ namespace AutoQueue
             {
                 i++;
                 gM.WaitOne();
+                req.ClearCookies();
                 if (Login(UserNameText.Text, PasswordText.Text))
                 {
                     UpdateInfo("提交请求...");
@@ -332,13 +348,15 @@ namespace AutoQueue
             string strViewState = null;
             string strValidation = null;
             string strResult = null;
+            string strCodeResult = null;
             string pattern1 = @"id=""__VIEWSTATE""\svalue=""(?<key>.+)""";
             string pattern2 = @"id=""__EVENTVALIDATION""\svalue=""(?<key>.+)""";
             string pattern4 = @"javascript'>alert\('(?<key>.+)'\)";
             string pattern5 = @"window\.location='(?<key>.+)'";
             string pattern6 = @"\[.+\].+\[(?<key>.+)\]";
             string pattern7 = @"\[综合报销业务].+\[(?<key>.+)\]";
-            string paramPattern = @"__VIEWSTATE={0}&__EVENTVALIDATION={1}&Repeater1$ctl00$ImageButton1.x={2}&Repeater1$ctl00$ImageButton1.y={3}&deptID=1&dateType=Today&timeType=AM";
+            //string paramPattern = @"__VIEWSTATE={0}&__EVENTVALIDATION={1}&Repeater1%24ctl00%24ImageButton1.x={2}&Repeater1%24ctl00%24ImageButton1.y={3}&Txt_Yzm={4}&deptID=1&dateType=Today&timeType=AM";
+            string paramPattern = @"__VIEWSTATE={0}&__EVENTVALIDATION={1}&Repeater1%24ctl00%24ImageButton1.x={2}&Repeater1%24ctl00%24ImageButton1.y={3}&deptID=1&dateType=Today&timeType=AM";
 
             try
             {
@@ -366,6 +384,12 @@ namespace AutoQueue
                     mySource.TraceEvent(TraceEventType.Error, 20, result);
                     return false;
                 }
+                // 识别验证码
+                string strCodeUrl = "http://cwcx.hfut.edu.cn/gif.aspx";
+                Image img = req.DownloadImg(strCodeUrl);
+                //picture.Image = img;
+                strCodeResult = DetectVerifyCode((Bitmap)img);
+                //CodeLabel.Text = strCodeResult;
             }
             catch (WebException we)
             {
@@ -385,8 +409,8 @@ namespace AutoQueue
             int y = rd.Next(20) + 5;
             strValidation = HttpUtility.UrlEncode(strValidation);
             strViewState = HttpUtility.UrlEncode(strViewState);
-            string postData = string.Format(paramPattern, strViewState,
-                                        strValidation, x, y);
+            //string postData = string.Format(paramPattern, strViewState, strValidation, x, y, strCodeResult);
+            string postData = string.Format(paramPattern, strViewState, strValidation, x, y);
             // 提交请求
             try
             {
@@ -464,6 +488,7 @@ namespace AutoQueue
             catch (WebException we)
             {
                 string msg = we.Message;
+                UpdateInfo(msg);
                 mySource.TraceEvent(TraceEventType.Error, 27, msg);
                 return false;
             }
@@ -564,6 +589,74 @@ namespace AutoQueue
                 strSaveName = strFileName + ".jpg";
             img.Save(strSaveName);
         }
+        public void Test()
+        {
+
+            // 下载验证码图片
+            string url = "http://cwcx.hfut.edu.cn/gif.aspx";
+            Image img = req.DownloadImg(url);
+            picture.Image = img;
+            CodeLabel.Text = DetectVerifyCode((Bitmap)img);
+
+        }
+        public string DetectVerifyCode(Bitmap img)
+        {
+            int[] PowerSum = new int[img.Width];
+            int i, j, k, nSum;
+            Color pixel;
+            // 统计
+            for (i = 0; i < img.Width; i++)
+            {
+                nSum = 0;
+                for (j = 0; j < img.Height; j++)
+                {
+                    pixel = img.GetPixel(i, j);
+                    nSum += pixel.R + pixel.B + pixel.G + pixel.A;
+                }
+                PowerSum[i] = nSum;
+            }
+            // 分割字符
+            int x_left = 1;
+            int x_right = 0;
+            int chLength;
+            bool bStatus = false;
+            string strResult = "";
+            for (k = 0; k < 4; k++)
+            {
+                while (PowerSum[x_left] == 0)
+                    x_left++;
+                x_right = x_left + 1;
+                while (PowerSum[x_right] != 0)
+                    x_right++;
+                chLength = x_right - x_left;
+
+                for (i = 0; i < 10; i++)
+                {
+                    if (ModelLength[i] == chLength)
+                    {
+                        bStatus = true;
+                        for (j = 0; j < chLength; j++)
+                        {
+                            if (ModelData[i, j] != PowerSum[x_left + j])
+                            {
+                                bStatus = false;
+                                break;
+                            }
+                        }
+                        if (bStatus)
+                        {
+                            strResult += Convert.ToChar(48 + i);
+                            break;
+                        }
+                    }
+                }
+                if (!bStatus && i == 10)
+                    strResult += 'X';
+                x_left = x_right + 1;
+
+            }
+            return strResult;
+        }
     }
 
     public class InternetRequest
@@ -573,6 +666,11 @@ namespace AutoQueue
         public InternetRequest()
         {
             // cookie容器
+            ckCollection = new CookieCollection();
+        }
+
+        public void ClearCookies()
+        {
             ckCollection = new CookieCollection();
         }
 
@@ -589,7 +687,7 @@ namespace AutoQueue
             req.Method = "POST";
             req.ContentLength = param.Length;
             req.AllowAutoRedirect = false;
-            req.Timeout = 5000;
+            req.Timeout = 3000;
             Stream webStream = req.GetRequestStream();
             webStream.Write(param, 0, param.Length);
             webStream.Close();
@@ -612,7 +710,7 @@ namespace AutoQueue
             req.Method = "GET";
             // 防止重定向无法获取Cookie
             req.AllowAutoRedirect = false;
-            req.Timeout = 5000;
+            req.Timeout = 3000;
             // 获得网站返回内容
             HttpWebResponse response = (HttpWebResponse)req.GetResponse();
             // 添加Cookie
@@ -633,7 +731,7 @@ namespace AutoQueue
             req.Method = "GET";
             // 防止重定向无法获取Cookie
             //req.AllowAutoRedirect = false;
-            req.Timeout = 5000;
+            req.Timeout = 3000;
             // 获得网站返回内容
             HttpWebResponse response = (HttpWebResponse)req.GetResponse();
             // 添加Cookie
